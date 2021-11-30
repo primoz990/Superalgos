@@ -157,6 +157,7 @@ function newWorkspace() {
     function runTasksAndSessions() {
         executeAction({ name: 'Syncronize Tasks', project: 'Visual-Scripting' })
         executeAction({ name: 'Syncronize Trading Sessions', project: 'Visual-Scripting' })
+        executeAction({ name: 'Syncronize Portfolio Sessions', project: 'Visual-Scripting' })
         executeAction({ name: 'Syncronize Learning Sessions', project: 'Visual-Scripting' })
     }
 
@@ -179,6 +180,10 @@ function newWorkspace() {
     }
 
     async function saveWorkspace(callBackFunction) {
+        if (UI.environment.DEMO_MODE === true) {
+            return
+        }
+
         let workspace = UI.projects.foundations.spaces.designSpace.workspace.workspaceNode
 
         /* Validation if it is too early to save. */
@@ -343,6 +348,7 @@ function newWorkspace() {
 
                     UI.projects.education.spaces.docsSpace.sidePanelTab.close()
                     UI.projects.foundations.spaces.workspaceSpace.sidePanelTab.close()
+                    UI.projects.foundations.spaces.codeEditorSpace.sidePanelTab.close()
                     UI.projects.foundations.spaces.floatingSpace.inMapMode = true
                     workingAtTask = 2
                     break
@@ -446,7 +452,7 @@ function newWorkspace() {
 
                         UI.projects.governance.spaces.reportsSpace.reset()
                         UI.projects.governance.spaces.userProfileSpace.reset()
-
+                        UI.projects.foundations.spaces.codeEditorSpace.reset()
                         await UI.projects.education.spaces.docsSpace.reset()
                         await UI.projects.education.spaces.tutorialSpace.reset()
 
@@ -513,6 +519,14 @@ function newWorkspace() {
                         if (lanNetworkNode.productionTradingTasks !== undefined && lanNetworkNode.productionTradingTasks.payload !== undefined) {
                             lanNetworkNode.productionTradingTasks.payload.uiObject.menu.internalClick('Stop All Exchange Trading Tasks')
                             lanNetworkNode.productionTradingTasks.payload.uiObject.menu.internalClick('Stop All Exchange Trading Tasks')
+                        }
+                        if (lanNetworkNode.testingPortfolioTasks !== undefined && lanNetworkNode.testingPortfolioTasks.payload !== undefined) {
+                            lanNetworkNode.testingPortfolioTasks.payload.uiObject.menu.internalClick('Stop All Exchange Portfolio Tasks')
+                            lanNetworkNode.testingPortfolioTasks.payload.uiObject.menu.internalClick('Stop All Exchange Portfolio Tasks')
+                        }
+                        if (lanNetworkNode.productionPortfolioTasks !== undefined && lanNetworkNode.productionPortfolioTasks.payload !== undefined) {
+                            lanNetworkNode.productionPortfolioTasks.payload.uiObject.menu.internalClick('Stop All Exchange Portfolio Tasks')
+                            lanNetworkNode.productionPortfolioTasks.payload.uiObject.menu.internalClick('Stop All Exchange Portfolio Tasks')
                         }
                     }
                 }
@@ -703,6 +717,9 @@ function newWorkspace() {
             thisObject.workspaceNode.rootNodes.push(droppedNode)
             executeAction({ node: droppedNode, name: 'Create UI Object', project: 'Visual-Scripting', extraParameter: positionOffset })
             executeAction({ name: 'Connect Children to Reference Parents', project: 'Visual-Scripting' })
+
+            // Recreate autocomplete models
+            UI.projects.foundations.spaces.codeEditorSpace.editorPage.reset()
 
             droppedNode = undefined
         } catch (err) {

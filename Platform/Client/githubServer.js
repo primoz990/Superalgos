@@ -4,6 +4,7 @@ exports.newGithubServer = function newGithubServer() {
         getGithubStars: getGithubStars,
         getGithubWatchers: getGithubWatchers,
         getGithubForks: getGithubForks,
+        createGithubFork: createGithubFork,
         mergePullRequests: mergePullRequests,
         initialize: initialize,
         finalize: finalize,
@@ -79,7 +80,7 @@ exports.newGithubServer = function newGithubServer() {
 
                 const octokit = new Octokit({
                     auth: token,
-                    userAgent: 'Superalgos Beta 12'
+                    userAgent: 'Superalgos ' + SA.version
                 })
                 await getList()
 
@@ -162,6 +163,46 @@ exports.newGithubServer = function newGithubServer() {
         }
     }
 
+    async function createGithubFork(token) {
+        try {
+            token = unescape(token)
+
+            await doGithub()
+
+            async function doGithub() {
+                try {
+                    const { Octokit } = SA.nodeModules.octokit
+                    const octokit = new Octokit({
+                        auth: token,
+                        userAgent: 'Superalgos ' + SA.version
+                    })
+
+                    await octokit.repos.createFork({
+                        owner: 'Superalgos',
+                        repo: 'Superalgos'
+                    })
+                } catch (err) {
+                    if (err === undefined) { return }
+                    console.log('[ERROR] Github Server -> createGithubFork -> doGithub -> err.stack = ' + err.stack)
+                }
+            }
+        } catch (err) {
+            console.log('[ERROR] Github Server -> createGithubFork -> Method call produced an error.')
+            console.log('[ERROR] Github Server -> createGithubFork -> err.stack = ' + err.stack)
+            console.log('[ERROR] Github Server -> createGithubFork -> repository = ' + repository)
+            console.log('[ERROR] Github Server -> createGithubFork -> username = ' + username)
+            console.log('[ERROR] Github Server -> createGithubFork -> token starts with = ' + token.substring(0, 10) + '...')
+            console.log('[ERROR] Github Server -> createGithubFork -> token ends with = ' + '...' + token.substring(token.length - 10))
+
+            let error = {
+                result: 'Fail Because',
+                message: err.message,
+                stack: err.stack
+            }
+            return error
+        }
+    }
+
     async function mergeGithubPullRequests(commitMessage, username, token) {
         try {
             commitMessage = unescape(commitMessage)
@@ -207,7 +248,7 @@ exports.newGithubServer = function newGithubServer() {
                     const { Octokit } = SA.nodeModules.octokit
                     const octokit = new Octokit({
                         auth: token,
-                        userAgent: 'Superalgos Beta 12'
+                        userAgent: 'Superalgos ' + SA.version
                     })
                     await getPrList()
                     await mergePrs()
@@ -284,13 +325,30 @@ exports.newGithubServer = function newGithubServer() {
                             /*
                             Lets get the files changed at this Pull Request.
                             */
-                            await PL.projects.foundations.utilities.asyncFunctions.sleep(GITHUB_API_WAITING_TIME)
-                            let listResponse = await octokit.rest.pulls.listFiles({
-                                owner: owner,
-                                repo: repo,
-                                pull_number: pullRequest.number
-                            });
-                            let filesChanged = listResponse.data
+                            let filesChanged = []
+                            const per_page = 100 // Max
+                            let page = 0
+                            let lastPage = false
+
+                            while (lastPage === false) {
+                                page++
+                                await PL.projects.foundations.utilities.asyncFunctions.sleep(GITHUB_API_WAITING_TIME)
+                                let listResponse = await octokit.rest.pulls.listFiles({
+                                    owner: owner,
+                                    repo: repo,
+                                    pull_number: pullRequest.number,
+                                    per_page: per_page,
+                                    page: page
+                                });
+
+                                if (listResponse.data.length < 100) {
+                                    lastPage = true
+                                }
+                                for (let i = 0; i < listResponse.data.length; i++) {
+                                    let listItem = listResponse.data[i]
+                                    filesChanged.push(listItem)
+                                }
+                            }
                             let fileContentUrl  // URL to the only file at the PR
                             let fileContent     // File content of the only file at the PR
                             let userProfile     // User Profile Object
@@ -306,6 +364,11 @@ exports.newGithubServer = function newGithubServer() {
                             if (await validateUserProfileIdDoesNotBelongtoAnotherUserProfile() === false) { continue }
                             if (await validateUserProfileBlockchainAccountDoesNotBelongtoAnotherUserProfile() === false) { continue }
                             if (await validateUserProfileSigningAccountsDoesNotBelongtoAnotherUserProfile() === false) { continue }
+
+                            /*
+                                TODO: We need to check before merging a User Profile that none of id of the node of the profile hierearchy exists at any other
+                                User Profile already at the repository, to avoid atacts of users highjacking references of other user profiles. 
+                            */
 
                             if (await mergePullRequest() === false) {
                                 console.log('[WARN] Github Server -> mergeGithubPullRequests -> Merge Failed -> Pull Request "' + pullRequest.title + '" not merged because Github could not merge it. -> mergeResponse.message = ' + mergeResponse.data.message)
